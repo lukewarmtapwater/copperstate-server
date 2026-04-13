@@ -18,7 +18,7 @@ app.get("/", (req, res) => {
 app.use(express.json());
 app.use(
   cors({
-    origin: "https://copperstate-client.vercel.app",
+    origin: process.env.CLIENT_URL,
     credentials: true,
   }),
 );
@@ -27,9 +27,6 @@ app.use(cookieParser());
 app.use("/user", userRouter);
 app.use("/admin", verifyToken, authorizeRole(0), adminRouter);
 
-app.get("/", (req, res) => {
-  res.json({ msg: "Hello world!" });
-});
 app.listen(port, () => {
   console.log(`Copperstate server is listening on port ${port}`);
 });

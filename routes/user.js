@@ -75,7 +75,6 @@ router.post("/sign-up", async (req, res) => {
     httpOnly: true,
     secure: true,
     sameSite: "none",
-    maxAge: 3600000,
   });
 
   res.status(201).json({ success: true });
@@ -105,7 +104,6 @@ router.post("/login", async (req, res) => {
     httpOnly: true,
     secure: true,
     sameSite: "none",
-    maxAge: 3600000,
   });
 
   return res.status(200).json({ success: true });
@@ -116,11 +114,12 @@ router.get("/me", verifyToken, async (req, res) =>
 );
 
 router.get("/log-out", verifyToken, async (req, res) => {
-  res.clearCookie("token", {
+  res.cookie("token", "", {
     httpOnly: true,
     secure: true,
     sameSite: "none",
-    maxAge: 3600000,
+    expires: new Date(0),
+    path: "/",
   });
 
   return res.status(200).json({ success: true });
