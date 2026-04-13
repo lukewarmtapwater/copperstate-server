@@ -118,7 +118,6 @@ router.get("/log-out", verifyToken, async (req, res) => {
     httpOnly: true,
     secure: true,
     sameSite: "none",
-    expires: new Date(0),
     path: "/",
   });
 
