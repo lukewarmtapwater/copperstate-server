@@ -118,8 +118,8 @@ router.get("/log-out", async (req, res) => {
     httpOnly: true,
     secure: true,
     sameSite: "none",
+    domain: ".copperstate-server.vercel.app",
     path: "/",
-    expires: new Date(0),
   });
 
   return res.status(200).json({ success: true });
