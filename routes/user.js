@@ -5,14 +5,6 @@ import database from "../conn.js";
 import "dotenv/config";
 import verifyToken from "../middleware/verifyToken.js";
 
-/* 
-  4 states: Admin, Mechanic, Inspector, Unassigned
-  0: Admin
-  1: Inspector
-  2: Mechanic
-  3: Unassigned
-  */
-
 const router = Router();
 
 router.post("/sign-up", async (req, res) => {
@@ -74,7 +66,8 @@ router.post("/sign-up", async (req, res) => {
   res.cookie("token", token, {
     httpOnly: true,
     secure: true,
-    sameSite: "none",
+    sameSite: "lax",
+    maxAge: 3 * 60 * 60 * 1000,
   });
 
   res.status(201).json({ success: true });
@@ -103,7 +96,8 @@ router.post("/login", async (req, res) => {
   res.cookie("token", token, {
     httpOnly: true,
     secure: true,
-    sameSite: "none",
+    sameSite: "lax",
+    maxAge: 3 * 60 * 60 * 1000,
   });
 
   return res.status(200).json({ success: true });
@@ -114,12 +108,10 @@ router.get("/me", verifyToken, async (req, res) =>
 );
 
 router.get("/log-out", async (req, res) => {
-  res.cookie("token", "", {
+  res.clearCookie("token", {
     httpOnly: true,
     secure: true,
-    sameSite: "none",
-    domain: ".copperstate-server.vercel.app",
-    path: "/",
+    sameSite: "lax",
   });
 
   return res.status(200).json({ success: true });
