@@ -14,11 +14,12 @@ router.post("/change-role", async (req, res) => {
   const { userEmail, role } = req.body;
 
   if (!userEmail || (!role && role !== 0)) {
-    return res.status(400).json({ error: "Incomplete body." });
+    return res.status(400).json({ success: false, error: "Incomplete body." });
   }
 
   if (req.user.email === userEmail) {
     return res.status(403).json({
+      success: false,
       error: "You cannot update your own role.",
     });
   }

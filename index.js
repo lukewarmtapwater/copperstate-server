@@ -8,6 +8,7 @@ import cookieParser from "cookie-parser";
 import verifyToken from "./middleware/verifyToken.js";
 import authorizeRole from "./middleware/authorizeRole.js";
 import errorHandler from "./middleware/errorHandler.js";
+import inventoryRouter from "./routes/inventory.js";
 
 const app = express();
 const port = process.env.PORT;
@@ -26,7 +27,8 @@ app.use(
 app.use(helmet());
 app.use(cookieParser());
 app.use("/user", userRouter);
-app.use("/admin", verifyToken, authorizeRole(0), adminRouter);
+app.use("/admin", verifyToken, authorizeRole([0]), adminRouter);
+app.use("/inventory", verifyToken, authorizeRole([0, 1, 2]), inventoryRouter);
 app.use(errorHandler);
 
 app.listen(port, () => {
