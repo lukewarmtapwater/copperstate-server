@@ -8,7 +8,7 @@ router.get("/", async (req, res) => {
   const col = database.collection("inventory");
   const cars = await col.find({}).toArray();
 
-  res.status(200).json({ cars });
+  res.status(200).json({ cars, user: req.user });
 });
 
 router.post("/create", async (req, res) => {
@@ -16,7 +16,8 @@ router.post("/create", async (req, res) => {
 
   if (!result.success) {
     return res.status(400).json({
-      error: result.error.flatten().fieldErrors,
+      success: false,
+      fieldErrors: result.error.flatten().fieldErrors,
     });
   }
 
