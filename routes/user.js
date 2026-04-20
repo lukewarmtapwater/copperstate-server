@@ -5,15 +5,23 @@ import database from "../conn.js";
 import "dotenv/config";
 import verifyToken from "../middleware/verifyToken.js";
 import { loginSchema, signUpSchema } from "../schemas/user-schema.js";
+import authorizeRoles from "../middleware/authorizeRoles.js";
+import { ObjectId } from "mongodb";
 
 const router = Router();
+
+router.get("/", verifyToken, authorizeRoles([0]), async (req, res) => {
+  const col = database.collection("users");
+  const users = await col.find({}, { projection: { password: 0 } }).toArray();
+
+  return res.status(200).json(users);
+});
 
 router.post("/sign-up", async (req, res) => {
   const result = signUpSchema.safeParse(req.body);
 
   if (!result.success) {
     return res.status(400).json({
-      success: false,
       fieldErrors: result.error.flatten().fieldErrors,
     });
   }
@@ -24,7 +32,6 @@ router.post("/sign-up", async (req, res) => {
   const oldUser = await col.findOne({ email: email.toLowerCase() });
   if (oldUser) {
     return res.status(409).json({
-      success: false,
       error: "User already exists. Please login.",
     });
   }
@@ -52,7 +59,7 @@ router.post("/sign-up", async (req, res) => {
     maxAge: 3 * 60 * 60 * 1000,
   });
 
-  res.status(201).json({ success: true });
+  return res.status(201).json(user);
 });
 
 router.post("/login", async (req, res) => {
@@ -60,7 +67,6 @@ router.post("/login", async (req, res) => {
 
   if (!result.success) {
     return res.status(400).json({
-      success: false,
       fieldErrors: result.error.flatten().fieldErrors,
     });
   }
@@ -70,9 +76,7 @@ router.post("/login", async (req, res) => {
   const user = await col.findOne({ email: email.toLowerCase() });
 
   if (!user || !(await compare(password, user.password))) {
-    return res
-      .status(401)
-      .json({ success: false, error: "Invalid email or password." });
+    return res.status(401).json({ error: "Invalid email or password." });
   }
 
   await col.updateOne({ email }, { $set: { lastLogin: new Date() } });
@@ -88,21 +92,59 @@ router.post("/login", async (req, res) => {
     maxAge: 3 * 60 * 60 * 1000,
   });
 
-  return res.status(200).json({ success: true });
+  return res.status(200).json(user);
 });
 
 router.get("/me", verifyToken, async (req, res) =>
   res.status(200).json(req.user),
 );
 
-router.post("/log-out", async (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "none",
-  });
+router.post(
+  "/change-role",
+  verifyToken,
+  authorizeRoles([0]),
+  async (req, res) => {
+    const { userEmail, role } = req.body;
 
-  res.status(200).json({ success: true });
+    if (!userEmail || (!role && role !== 0)) {
+      return res.status(400).json({ error: "Incomplete body." });
+    }
+
+    if (req.user.email === userEmail) {
+      return res.status(403).json({
+        error: "You cannot update your own role.",
+      });
+    }
+
+    const col = database.collection("users");
+
+    const updatedUser = await col.findOneAndUpdate(
+      { email: userEmail },
+      { $set: { role } },
+      { returnDocument: "after" },
+    );
+
+    return res.status(200).json(updatedUser);
+  },
+);
+
+router.get("/:userId", verifyToken, async (req, res) => {
+  const { userId } = req.params;
+  const usersCol = database.collection("users");
+  const inventoryCol = database.collection("inventory");
+  const user = await usersCol.findOne({ _id: new ObjectId(userId) });
+
+  if (!user) {
+    return res.status(404).json({
+      error: "User not found.",
+    });
+  }
+
+  const cars = await inventoryCol
+    .find({ postedBy: new ObjectId(userId) })
+    .toArray();
+
+  return res.status(200).json({ cars, user });
 });
 
 export default router;

@@ -3,10 +3,9 @@ import cors from "cors";
 import helmet from "helmet";
 import "dotenv/config";
 import userRouter from "./routes/user.js";
-import adminRouter from "./routes/admin.js";
 import cookieParser from "cookie-parser";
 import verifyToken from "./middleware/verifyToken.js";
-import authorizeRole from "./middleware/authorizeRole.js";
+import authorizeRoles from "./middleware/authorizeRoles.js";
 import errorHandler from "./middleware/errorHandler.js";
 import inventoryRouter from "./routes/inventory.js";
 
@@ -26,9 +25,8 @@ app.use(
 );
 app.use(helmet());
 app.use(cookieParser());
-app.use("/user", userRouter);
-app.use("/admin", verifyToken, authorizeRole([0]), adminRouter);
-app.use("/inventory", verifyToken, authorizeRole([0, 1, 2]), inventoryRouter);
+app.use("/users", userRouter);
+app.use("/inventory", verifyToken, authorizeRoles([0, 1, 2]), inventoryRouter);
 app.use(errorHandler);
 
 app.listen(port, () => {

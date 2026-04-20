@@ -8,7 +8,7 @@ router.get("/", async (req, res) => {
   const col = database.collection("inventory");
   const cars = await col.find({}).toArray();
 
-  res.status(200).json({ cars, user: req.user });
+  return res.status(200).json({ cars, user: req.user });
 });
 
 router.post("/create", async (req, res) => {
@@ -16,7 +16,6 @@ router.post("/create", async (req, res) => {
 
   if (!result.success) {
     return res.status(400).json({
-      success: false,
       fieldErrors: result.error.flatten().fieldErrors,
     });
   }
@@ -25,10 +24,10 @@ router.post("/create", async (req, res) => {
   await col.insertOne({
     ...result.data,
     createdOn: new Date(),
-    postedBy: req.user.email,
+    postedBy: req.user._id,
   });
 
-  res.status(200).json(result);
+  return res.status(201).json(result);
 });
 
 export default router;
