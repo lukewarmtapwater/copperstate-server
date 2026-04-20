@@ -104,22 +104,16 @@ router.post(
   verifyToken,
   authorizeRoles([0]),
   async (req, res) => {
-    const { userEmail, role } = req.body;
+    const { userId, role } = req.body;
 
-    if (!userEmail || (!role && role !== 0)) {
+    if (!userId || (!role && role !== 0)) {
       return res.status(400).json({ error: "Incomplete body." });
-    }
-
-    if (req.user.email === userEmail) {
-      return res.status(403).json({
-        error: "You cannot update your own role.",
-      });
     }
 
     const col = database.collection("users");
 
     const updatedUser = await col.findOneAndUpdate(
-      { email: userEmail },
+      { _id: new ObjectId(userId) },
       { $set: { role } },
       { returnDocument: "after" },
     );
