@@ -1,6 +1,7 @@
 import { Router } from "express";
 import carSchema from "../schemas/car-schema.js";
 import database from "../conn.js";
+import { ObjectId } from "mongodb";
 
 const router = Router();
 
@@ -28,6 +29,20 @@ router.post("/create", async (req, res) => {
   });
 
   return res.status(201).json(result);
+});
+
+router.get("/:carId", async (req, res) => {
+  const { carId } = req.params;
+  const col = database.collection("inventory");
+  const car = await col.findOne({ _id: new ObjectId(carId) });
+
+  if (!car) {
+    return res.status(404).json({
+      error: "Car not found.",
+    });
+  }
+
+  return res.status(200).json(car);
 });
 
 export default router;
