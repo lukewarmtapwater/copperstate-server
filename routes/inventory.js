@@ -53,7 +53,7 @@ router.get("/:carId", async (req, res) => {
   return res.status(200).json(car);
 });
 
-router.post("/:carId/status", async (req, res) => {
+router.patch("/:carId/status", async (req, res) => {
   const { carId } = req.params;
   const { newStatus } = req.body;
 

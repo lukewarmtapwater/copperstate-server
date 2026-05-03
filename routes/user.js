@@ -105,7 +105,7 @@ router.get("/me", verifyToken, async (req, res) =>
   res.status(200).json(req.user),
 );
 
-router.post(
+router.patch(
   "/:userId/role",
   verifyToken,
   authorizeRoles(["admin"]),
@@ -135,6 +135,15 @@ router.post(
     return res.status(200).json(updatedUser);
   },
 );
+
+router.post("/logout", (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+  });
+  return res.status(200).json({ message: "Logged out successfully." });
+});
 
 router.get("/:userId", verifyToken, async (req, res) => {
   const { userId } = req.params;
