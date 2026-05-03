@@ -5,15 +5,20 @@ const connectionString = process.env.CONNECTION_STRING;
 
 const client = new MongoClient(connectionString);
 
-let conn;
+let database;
 
-try {
-  conn = await client.connect();
-  console.log("Connected to the database successfully.");
-} catch (e) {
-  console.error(e);
+async function getDatabase() {
+  if (!database) {
+    try {
+      const conn = await client.connect();
+      database = conn.db("copperstate");
+      console.log("Connected to the database successfully.");
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  }
+  return database;
 }
 
-const database = conn.db("copperstate");
-
-export default database;
+export default getDatabase;

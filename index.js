@@ -26,7 +26,12 @@ app.use(
 app.use(helmet());
 app.use(cookieParser());
 app.use("/users", userRouter);
-app.use("/inventory", verifyToken, authorizeRoles([0, 1, 2]), inventoryRouter);
+app.use(
+  "/inventory",
+  verifyToken,
+  authorizeRoles(["admin", "inspector", "mechanic"]),
+  inventoryRouter,
+);
 app.use(errorHandler);
 
 app.listen(port, () => {

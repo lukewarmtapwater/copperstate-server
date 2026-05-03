@@ -1,16 +1,18 @@
 import { Router } from "express";
 import { hash, compare } from "bcryptjs";
 import jwt from "jsonwebtoken";
-import database from "../conn.js";
+import getDatabase from "../conn.js";
 import "dotenv/config";
 import verifyToken from "../middleware/verifyToken.js";
 import { loginSchema, signUpSchema } from "../schemas/user-schema.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
 import { ObjectId } from "mongodb";
+import { roleEnum } from "../schemas/user-schema.js";
 
 const router = Router();
 
-router.get("/", verifyToken, authorizeRoles([0]), async (req, res) => {
+router.get("/", verifyToken, authorizeRoles(["admin"]), async (req, res) => {
+  const database = await getDatabase();
   const col = database.collection("users");
   const users = await col.find({}, { projection: { password: 0 } }).toArray();
 
@@ -27,6 +29,7 @@ router.post("/sign-up", async (req, res) => {
   }
 
   const { email, password } = result.data;
+  const database = await getDatabase();
   const col = database.collection("users");
 
   const oldUser = await col.findOne({ email: email.toLowerCase() });
@@ -41,9 +44,9 @@ router.post("/sign-up", async (req, res) => {
   const user = {
     email: email.toLowerCase(),
     password: encryptedUserPassword,
-    accountCreated: new Date(),
+    createdOn: new Date(),
     lastLogin: new Date(),
-    role: 3,
+    role: "unassigned",
   };
 
   await col.insertOne(user);
@@ -59,7 +62,8 @@ router.post("/sign-up", async (req, res) => {
     maxAge: 3 * 60 * 60 * 1000,
   });
 
-  return res.status(201).json(user);
+  const { password: _pw, ...safeUser } = user;
+  return res.status(201).json(safeUser);
 });
 
 router.post("/login", async (req, res) => {
@@ -72,6 +76,7 @@ router.post("/login", async (req, res) => {
   }
 
   const { email, password } = result.data;
+  const database = await getDatabase();
   const col = database.collection("users");
   const user = await col.findOne({ email: email.toLowerCase() });
 
@@ -92,7 +97,8 @@ router.post("/login", async (req, res) => {
     maxAge: 3 * 60 * 60 * 1000,
   });
 
-  return res.status(200).json(user);
+  const { password: _pw, ...safeUser } = user;
+  return res.status(200).json(safeUser);
 });
 
 router.get("/me", verifyToken, async (req, res) =>
@@ -100,21 +106,29 @@ router.get("/me", verifyToken, async (req, res) =>
 );
 
 router.post(
-  "/change-role",
+  "/:userId/role",
   verifyToken,
-  authorizeRoles([0]),
+  authorizeRoles(["admin"]),
   async (req, res) => {
-    const { userId, role } = req.body;
+    const { userId } = req.params;
+    const { newRole } = req.body;
 
-    if (!userId || (!role && role !== 0)) {
+    if (!newRole) {
       return res.status(400).json({ error: "Incomplete body." });
     }
 
+    const result = roleEnum.safeParse(newRole);
+
+    if (!result.success) {
+      return res.status(400).json({ error: "Invalid role." });
+    }
+
+    const database = await getDatabase();
     const col = database.collection("users");
 
     const updatedUser = await col.findOneAndUpdate(
       { _id: new ObjectId(userId) },
-      { $set: { role } },
+      { $set: { role: newRole } },
       { returnDocument: "after" },
     );
 
@@ -124,6 +138,8 @@ router.post(
 
 router.get("/:userId", verifyToken, async (req, res) => {
   const { userId } = req.params;
+
+  const database = await getDatabase();
   const usersCol = database.collection("users");
   const inventoryCol = database.collection("inventory");
   const user = await usersCol.findOne({ _id: new ObjectId(userId) });
