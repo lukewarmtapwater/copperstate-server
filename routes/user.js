@@ -1,22 +1,19 @@
 import { Router } from "express";
 import { hash, compare } from "bcryptjs";
 import jwt from "jsonwebtoken";
-import getDatabase from "../conn.js";
+import pool from "../conn.js";
 import "dotenv/config";
 import verifyToken from "../middleware/verifyToken.js";
-import { loginSchema, signUpSchema } from "../schemas/user-schema.js";
+import { loginSchema, signUpSchema, roleEnum } from "../schemas/user-schema.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
-import { ObjectId } from "mongodb";
-import { roleEnum } from "../schemas/user-schema.js";
 
 const router = Router();
 
 router.get("/", verifyToken, authorizeRoles(["admin"]), async (req, res) => {
-  const database = await getDatabase();
-  const col = database.collection("users");
-  const users = await col.find({}, { projection: { password: 0 } }).toArray();
-
-  return res.status(200).json(users);
+  const [rows] = await pool.execute(
+    "SELECT id, email, lastLogin, createdOn, role FROM users",
+  );
+  return res.status(200).json(rows);
 });
 
 router.post("/sign-up", async (req, res) => {
@@ -29,41 +26,42 @@ router.post("/sign-up", async (req, res) => {
   }
 
   const { email, password } = result.data;
-  const database = await getDatabase();
-  const col = database.collection("users");
 
-  const oldUser = await col.findOne({ email: email.toLowerCase() });
-  if (oldUser) {
-    return res.status(409).json({
-      error: "User already exists. Please login.",
-    });
+  const [existing] = await pool.execute(
+    "SELECT id FROM users WHERE email = ?",
+    [email.toLowerCase()],
+  );
+
+  if (existing.length > 0) {
+    return res
+      .status(409)
+      .json({ error: "User already exists. Please login." });
   }
 
-  const encryptedUserPassword = await hash(password, 10);
+  const encryptedPassword = await hash(password, 10);
 
-  const user = {
-    email: email.toLowerCase(),
-    password: encryptedUserPassword,
-    createdOn: new Date(),
-    lastLogin: new Date(),
-    role: "unassigned",
-  };
+  const [insertResult] = await pool.execute(
+    "INSERT INTO users (email, password, lastLogin, createdOn, role) VALUES (?, ?, NOW(), NOW(), 'unassigned')",
+    [email.toLowerCase(), encryptedPassword],
+  );
 
-  await col.insertOne(user);
+  const [newRows] = await pool.execute(
+    "SELECT id, email, lastLogin, createdOn, role FROM users WHERE id = ?",
+    [insertResult.insertId],
+  );
 
-  const token = jwt.sign({ email: user.email }, process.env.SECRET_KEY, {
+  const token = jwt.sign({ email: newRows[0].email }, process.env.SECRET_KEY, {
     expiresIn: "3h",
   });
 
   res.cookie("token", token, {
     httpOnly: true,
-    secure: true,
-    sameSite: "none",
+    secure: false,
+    sameSite: "lax",
     maxAge: 3 * 60 * 60 * 1000,
   });
 
-  const { password: _pw, ...safeUser } = user;
-  return res.status(201).json(safeUser);
+  return res.status(201).json(newRows[0]);
 });
 
 router.post("/login", async (req, res) => {
@@ -76,24 +74,29 @@ router.post("/login", async (req, res) => {
   }
 
   const { email, password } = result.data;
-  const database = await getDatabase();
-  const col = database.collection("users");
-  const user = await col.findOne({ email: email.toLowerCase() });
+
+  const [rows] = await pool.execute("SELECT * FROM users WHERE email = ?", [
+    email.toLowerCase(),
+  ]);
+
+  const user = rows[0];
 
   if (!user || !(await compare(password, user.password))) {
     return res.status(401).json({ error: "Invalid email or password." });
   }
 
-  await col.updateOne({ email }, { $set: { lastLogin: new Date() } });
+  await pool.execute("UPDATE users SET lastLogin = NOW() WHERE id = ?", [
+    user.id,
+  ]);
 
-  const token = jwt.sign({ email }, process.env.SECRET_KEY, {
+  const token = jwt.sign({ email: user.email }, process.env.SECRET_KEY, {
     expiresIn: "3h",
   });
 
   res.cookie("token", token, {
     httpOnly: true,
-    secure: true,
-    sameSite: "none",
+    secure: false,
+    sameSite: "lax",
     maxAge: 3 * 60 * 60 * 1000,
   });
 
@@ -110,60 +113,69 @@ router.patch(
   verifyToken,
   authorizeRoles(["admin"]),
   async (req, res) => {
-    const { userId } = req.params;
-    const { newRole } = req.body;
+    const userId = parseInt(req.params.userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID." });
+    }
 
+    const { newRole } = req.body;
     if (!newRole) {
       return res.status(400).json({ error: "Incomplete body." });
     }
 
-    const result = roleEnum.safeParse(newRole);
-
-    if (!result.success) {
+    const roleResult = roleEnum.safeParse(newRole);
+    if (!roleResult.success) {
       return res.status(400).json({ error: "Invalid role." });
     }
 
-    const database = await getDatabase();
-    const col = database.collection("users");
-
-    const updatedUser = await col.findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: { role: newRole } },
-      { returnDocument: "after" },
+    const [result] = await pool.execute(
+      "UPDATE users SET role = ? WHERE id = ?",
+      [newRole, userId],
     );
 
-    return res.status(200).json(updatedUser);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    const [updated] = await pool.execute(
+      "SELECT id, email, lastLogin, createdOn, role FROM users WHERE id = ?",
+      [userId],
+    );
+
+    return res.status(200).json(updated[0]);
   },
 );
 
 router.post("/logout", (req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
-    secure: true,
-    sameSite: "none",
+    secure: false,
+    sameSite: "lax",
   });
   return res.status(200).json({ message: "Logged out successfully." });
 });
 
 router.get("/:userId", verifyToken, async (req, res) => {
-  const { userId } = req.params;
-
-  const database = await getDatabase();
-  const usersCol = database.collection("users");
-  const inventoryCol = database.collection("inventory");
-  const user = await usersCol.findOne({ _id: new ObjectId(userId) });
-
-  if (!user) {
-    return res.status(404).json({
-      error: "User not found.",
-    });
+  const userId = parseInt(req.params.userId);
+  if (isNaN(userId)) {
+    return res.status(400).json({ error: "Invalid user ID." });
   }
 
-  const cars = await inventoryCol
-    .find({ postedBy: new ObjectId(userId) })
-    .toArray();
+  const [userRows] = await pool.execute(
+    "SELECT id, email, lastLogin, createdOn, role FROM users WHERE id = ?",
+    [userId],
+  );
 
-  return res.status(200).json({ cars, user });
+  if (userRows.length === 0) {
+    return res.status(404).json({ error: "User not found." });
+  }
+
+  const [carRows] = await pool.execute(
+    "SELECT * FROM cars WHERE createdBy = ?",
+    [userId],
+  );
+
+  return res.status(200).json({ user: userRows[0], cars: carRows });
 });
 
 export default router;

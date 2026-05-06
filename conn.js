@@ -1,28 +1,15 @@
-import { MongoClient } from "mongodb";
+import mysql from "mysql2/promise";
 import "dotenv/config";
 
-const connectionString = process.env.CONNECTION_STRING;
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT) || 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  timezone: "+00:00",
+});
 
-const client = new MongoClient(connectionString);
-
-let database;
-
-async function getDatabase() {
-  if (!database) {
-    try {
-      const conn = await client.connect();
-      database = conn.db("copperstate");
-      await database
-        .collection("users")
-        .createIndex({ email: 1 }, { unique: true });
-      await database.collection("inventory").createIndex({ postedBy: 1 });
-      console.log("Connected to the database successfully.");
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
-  }
-  return database;
-}
-
-export default getDatabase;
+export default pool;

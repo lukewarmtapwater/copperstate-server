@@ -1,13 +1,5 @@
 import { z } from "zod";
 
-const inspectionSchema = z.object({
-  windshield: z.enum(["Needed", "Not Needed", "Ordered"]),
-  rimDamage: z.enum(["Light", "Medium", "Severe"]),
-  camera: z.enum(["Yes", "No"]),
-  steering: z.enum(["Yes", "No"]),
-  upholstery: z.enum(["Light", "Medium", "Severe"]),
-});
-
 export const statusEnum = z.enum(["Awaiting Inspection", "Inspected"]);
 
 export const carSchema = z.object({
@@ -22,7 +14,9 @@ export const carSchema = z.object({
   make: z.string().min(1, "Make is required"),
   model: z.string().min(1, "Model is required"),
   location: z.string().min(1, "Location is required"),
-  daysOnLot: z.string().min(1, "Days on lot are required"),
-  inspection: inspectionSchema,
+  windshield: z.enum(["none", "light", "severe"]),
+  rimDamage: z.enum(["none", "light", "severe"]),
+  camera: z.enum(["yes", "no"]),
+  steering: z.enum(["yes", "no"]),
   status: statusEnum,
 });

@@ -1,27 +1,26 @@
 import jwt from "jsonwebtoken";
 import "dotenv/config";
-import getDatabase from "../conn.js";
+import pool from "../conn.js";
 
 async function verifyToken(req, res, next) {
   const token = req.cookies.token;
 
   if (!token) {
-    return res.status(401).json({ error: "Not logged in!" });
+    return res.status(401).json({ error: "No token provided." });
   }
-
-  const database = await getDatabase();
-  const col = database.collection("users");
 
   try {
     const decoded = jwt.verify(token, process.env.SECRET_KEY);
-    const user = await col.findOne({ email: decoded.email });
+    const [rows] = await pool.execute(
+      "SELECT id, email, role, lastLogin, createdOn FROM users WHERE email = ?",
+      [decoded.email],
+    );
 
-    if (!user) {
+    if (rows.length === 0) {
       return res.status(401).json({ error: "User not found." });
     }
 
-    const { password, ...safeUser } = user;
-    req.user = safeUser;
+    req.user = rows[0];
 
     next();
   } catch (err) {
