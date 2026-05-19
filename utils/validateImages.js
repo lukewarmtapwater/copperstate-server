@@ -1,8 +1,10 @@
-function validateImages(files = []) {
+function validateImages(files = [], isRequired = false) {
   const errors = [];
 
   if (files.length === 0) {
-    errors.push("Images are required");
+    if (isRequired) {
+      errors.push("Images are required");
+    }
     return errors;
   }
 
@@ -20,10 +22,10 @@ function validateImages(files = []) {
     errors.push("Only JPG, PNG, WEBP images allowed");
   }
 
-  const hasTooLarge = files.some((file) => file.size > 2 * 1024 * 1024);
+  const hasTooLarge = files.some((file) => file.size > 10 * 1024 * 1024);
 
   if (hasTooLarge) {
-    errors.push("Each image must be under 2MB");
+    errors.push("Each image must be under 10MB");
   }
 
   return errors;

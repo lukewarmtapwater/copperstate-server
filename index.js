@@ -18,13 +18,20 @@ const port = process.env.PORT;
 app.use(express.json());
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: [
+      process.env.CLIENT_URL_1,
+      process.env.CLIENT_URL_2
+    ],
     credentials: true,
   }),
 );
 app.use(helmet());
 app.use(cookieParser());
-app.use("/users", upload.none(), userRouter);
+app.use(
+  "/users",
+  upload.none(),
+  userRouter,
+);
 app.use(
   "/inventory",
   verifyToken,

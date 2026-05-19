@@ -16,7 +16,7 @@ export const statusEnum = z.enum([
 
 export const carSchema = z.object({
   year: z.coerce
-    .number()
+    .number("Please enter a valid year.")
     .min(1, "Year is required")
     .min(1900, "Year is too old")
     .max(
